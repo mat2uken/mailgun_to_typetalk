@@ -11,6 +11,9 @@ import os
 MAILGUN_API_KEY = os.environ.get('MAILGUN_API_KEY')
 MAILGUN_VALIDATION_KEY = os.environ.get('MAILGUN_VALIDATION_KEY')
 TYPETALK_TOKEN = os.environ.get('TYPETALK_TOKEN')
+TYPETALK_CLIENT_ID = os.environ.get('TYPETALK_CLIENT_ID')
+TYPETALK_CLIENT_SECRET = os.environ.get('TYPETALK_CLIENT_SECRET')
+
 if os.environ.get('GAE_ENV') != 'standard':
     import yaml
     data = yaml.load(open('secret.yaml'))
@@ -18,26 +21,34 @@ if os.environ.get('GAE_ENV') != 'standard':
     MAILGUN_API_KEY = env['MAILGUN_API_KEY']
     MAILGUN_VALIDATION_KEY = env['MAILGUN_VALIDATION_KEY']
     TYPETALK_TOKEN = env['TYPETALK_TOKEN']
+    TYPETALK_CLIENT_ID = env['TYPETALK_CLIENT_ID']
+    TYPETALK_CLIENT_SECRET = env['TYPETALK_CLIENT_SECRET']
 
 print('MAILGUN_API_KEY: {}'.format(MAILGUN_API_KEY))
 print('MAILGUN_VALIDATION_KEY: {}'.format(MAILGUN_VALIDATION_KEY))
 print('TYPETALK_TOKEN: {}'.format(TYPETALK_TOKEN))
+print('TYPETALK_CLIENT_ID: {}'.format(TYPETALK_CLIENT_ID))
+print('TYPETALK_CLIENT_SECRET: {}'.format(TYPETALK_CLIENT_SECRET))
 
 import requests
 import json
+
 
 @app.route('/')
 def hello():
     """Return a friendly HTTP greeting."""
     return 'Hello World!'
 
+
 @app.route('/recv_email', methods=['POST'])
 def recv_email():
     "Receive from mailgun as HTTP request"
 
     message_id = request.form.get('Message-Id')
+    print('Start processing message: {}'.format(message_id))
+
     message_url = request.form.get('message-url')
-    print('[{}]notified message-url: {}'.format(message_id, message_url))
+    print('notified message-url: {}'.format(message_url))
 
     topicid, message = get_message_from_mailgun(message_url)
     print("received message to Typetalk({}): {}".format(topicid, message['msgbody']))
@@ -46,13 +57,14 @@ def recv_email():
 
     return 'OK'
 
+
 def get_message_from_mailgun(message_url):
     "Get message and attachments from Mailgun API"
 
     auth = ('api', MAILGUN_API_KEY)
     message = requests.get(message_url, auth=auth)
     if message.status_code != 200:
-        abort(400, "cannnot get message from mailgun: {}".format(message_url))
+        abort(500, "cannnot get message from mailgun: {}".format(message_url))
 
     msgjson = json.loads(message.text)
 
@@ -102,6 +114,7 @@ attachments: {}""".format(subject, fromaddr, toaddr, msg_body,
     return (topicid, dict(subject=subject, fromaddr=fromaddr, toaddr=toaddr,
                 msgbody=msg_body, attachments=attachments))
 
+
 def parse_topicid_toaddr(toaddr):
     "Email address validation and extract typetalk topic id by Mailgun API"
 
@@ -132,6 +145,7 @@ def parse_topicid_toaddr(toaddr):
 
     return topicid
 
+
 TYPETALK_API_URL = 'https://typetalk.com/api/v1/topics/'
 def post_to_typetalk(topicid, message):
     topicid= 97119
@@ -148,11 +162,13 @@ def post_to_typetalk(topicid, message):
             if r.status_code == 200:
                 uploaded_filekeys.append(json.loads(r.text).get('fileKey'))
 
+    # get or create matome
+    talkid = get_or_create_typetalk_matome(topicid, message.get('fromaddr'))
+
     # post message
     postmsg = 'メールを受信しました。\n'
     postmsg += '`From: {}`\n`件名: {}`\n'.format(
-               message.get('toaddr'), message.get('fromaddr'),
-               message.get('subject'))
+               message.get('fromaddr'), message.get('subject'))
     postmsg += '-' * 60 + '\n'
     for l in message.get('msgbody').split('\n'):
         postmsg += '>{}'.format(l)
@@ -161,10 +177,45 @@ def post_to_typetalk(topicid, message):
     payload = {'message': postmsg}
     for i, uf in enumerate(uploaded_filekeys):
         payload['fileKeys[{}]'.format(i)] = uf
+    payload['talkIds[0]'] = talkid
     r = requests.post(url, data=payload, headers=headers)
     if r.status_code != 200:
         abort(500, r.text)
     return r.text
+
+
+def get_typetalk_credential(scope='topic.read,topic.post,topic.write'):
+    r = requests.post("https://typetalk.com/oauth2/access_token", {
+            'client_id': TYPETALK_CLIENT_ID,
+            'client_secret': TYPETALK_CLIENT_SECRET,
+            'grant_type': 'client_credentials',
+            'scope': scope})
+    if r.status_code !=200:
+        abort(500, "typetalk api error: status code={}, {}".format(r.status_code, r.text))
+
+    return r.json()['access_token']
+
+
+def get_or_create_typetalk_matome(topicid, name):
+    url = TYPETALK_API_URL + str(topicid) + '/talks'
+    headers = {'Authorization':'Bearer '+ get_typetalk_credential()}
+
+    r = requests.get(url, headers=headers)
+    if r.status_code != 200:
+        abort(500, "typetalk api error")
+
+    talksjson = json.loads(r.text)
+    for talk in talksjson['talks']:
+        if talk['name'] == name:
+            return talk['id']
+
+    payload = {'talkName': name}
+    r = requests.post(url, payload, headers=headers)
+    if r.status_code != 200:
+        abort(500, 'typetalk api error')
+
+    talkjson = json.loads(r.text)
+    return talkjson['talk']['id']
 
 if __name__ == '__main__':
     # This is used when running locally only. When deploying to Google App
