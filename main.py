@@ -48,7 +48,7 @@ def recv_email():
     print('notified message-url: {}'.format(message_url))
 
     topicid, message = get_message_from_mailgun(message_url)
-    print("received message to Typetalk({}): {}".format(topicid, message['msgbody']))
+    print("received message to Typetalk({}): {}".format(topicid, message['body']))
 
     ret = post_to_typetalk(topicid, message)
     print("post to typetalk is succeeded: {}".format(str(ret)))
@@ -85,10 +85,6 @@ def get_message_from_mailgun(message_url):
     body_plain = msgjson.get('body-plain')
     stripped_text = msgjson.get('stripped-text')
 
-    msg_body = body_plain
-    if msg_body is not None:
-        msg_body = stripped_text
-
     attachments = []
     for attachment in msgjson.get('attachments'):
         content_type = attachment.get('content-type')
@@ -108,12 +104,12 @@ from: {}, to: {},
 ---------------------------------------------------
 {}
 ---------------------------------------------------
-attachments: {}""".format(subject, fromaddr, toaddr, msg_body,
+attachments: {}""".format(subject, fromaddr, toaddr, body_plain,
                               ', '.join([x['name'] for x in attachments]))
     print(log_msg)
 
     return (topicid, dict(subject=subject, fromaddr=fromaddr, toaddr=toaddr,
-                msgbody=msg_body, attachments=attachments))
+                body=body_plain, attachments=attachments))
 
 
 def validate_email_address(addr):
@@ -185,7 +181,7 @@ def post_to_typetalk(topicid, message):
                message.get('toaddr'),
                message.get('subject'))
     postmsg += '-' * 60 + '\n'
-    for l in message.get('msgbody').split('\n'):
+    for l in message.get('body').split('\n'):
         postmsg += '>{}'.format(l)
 
     url = TYPETALK_API_URL + str(topicid)
