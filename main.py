@@ -116,19 +116,22 @@ attachments: {}""".format(subject, fromaddr, toaddr, msg_body,
                 msgbody=msg_body, attachments=attachments))
 
 
-def parse_topicid_toaddr(toaddr):
-    "Email address validation and extract typetalk topic id by Mailgun API"
-
+def validate_email_address(addr):
     auth = ('api', MAILGUN_VALIDATION_KEY)
     VALIDATION_API_URL = 'https://api.mailgun.net/v3/address/validate'
 
     import urllib
-    query = urllib.parse.urlencode(dict(address=toaddr))
+    query = urllib.parse.urlencode(dict(address=addr))
     r = requests.get(VALIDATION_API_URL+'?{}'.format(query), auth=auth)
     if r.status_code != 200:
         abort(500, 'error')
-    addrjson = json.loads(r.text)
 
+    return json.loads(r.text)
+
+def parse_topicid_toaddr(toaddr):
+    "Email address validation and extract typetalk topic id by Mailgun API"
+
+    addrjson = validate_email_address(toaddr)
     parts = addrjson['parts']
     print('display_name: {}, domain: {}, local_part: {}'.format(
         parts.get('display_name'), parts.get('domain'), parts.get('local_part')
@@ -165,12 +168,22 @@ def post_to_typetalk(topicid, message):
                 uploaded_filekeys.append(json.loads(r.text).get('fileKey'))
 
     # get or create matome
-    talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid, message.get('fromaddr'))
+    addrjson = validate_email_address(message.get('fromaddr'))
+    parts = addrjson['parts']
+    talkname = '{}@{}'.format(parts['local_part'], parts['domain'])
+    from_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid,
+                                                talkname)
+
+    addrjson = validate_email_address(message.get('toaddr'))
+    to_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid,
+                                                addrjson['parts']['local_part'])
 
     # post message
     postmsg = 'メールを受信しました。\n'
-    postmsg += '`From: {}`\n`件名: {}`\n'.format(
-               message.get('fromaddr'), message.get('subject'))
+    postmsg += '`From: {}`\n`To: {}`\n\n`件名: {}`\n'.format(
+               message.get('fromaddr'),
+               message.get('toaddr'),
+               message.get('subject'))
     postmsg += '-' * 60 + '\n'
     for l in message.get('msgbody').split('\n'):
         postmsg += '>{}'.format(l)
@@ -179,7 +192,8 @@ def post_to_typetalk(topicid, message):
     payload = {'message': postmsg}
     for i, uf in enumerate(uploaded_filekeys):
         payload['fileKeys[{}]'.format(i)] = uf
-    payload['talkIds[0]'] = talkid
+    payload['talkIds[0]'] = from_talkid
+    payload['talkIds[1]'] = to_talkid
     r = requests.post(url, data=payload, headers=headers)
     if r.status_code != 200:
         abort(500, r.text)
