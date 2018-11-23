@@ -68,12 +68,15 @@ def get_message_from_mailgun(message_url):
 
     fromaddr = msgjson.get('From')
     toaddr = msgjson.get('To')
-    recipient = msgjson.get('recipient')
+    recipients = msgjson.get('recipients')
     sender = msgjson.get('sender')
     subject = msgjson.get('subject')
+    print('from: {}, to: {}, recipients: {}, sender: {}'.format(
+        fromaddr, toaddr, recipients, sender
+    ))
 
     # Typetalkのtopicはfromのtypetalk-xxxxのxxxxをidとしてtopicを特定
-    topicid = parse_topicid_toaddr(toaddr)
+    topicid = parse_topicid_toaddr(recipients)
     if topicid is None:
         abort(500, 'To addr is not valid as topic id: {}'.format(toaddr))
     else:
