@@ -10,7 +10,6 @@ import os
 
 MAILGUN_API_KEY = os.environ.get('MAILGUN_API_KEY')
 MAILGUN_VALIDATION_KEY = os.environ.get('MAILGUN_VALIDATION_KEY')
-TYPETALK_TOKEN = os.environ.get('TYPETALK_TOKEN')
 TYPETALK_CLIENT_ID = os.environ.get('TYPETALK_CLIENT_ID')
 TYPETALK_CLIENT_SECRET = os.environ.get('TYPETALK_CLIENT_SECRET')
 
@@ -20,13 +19,11 @@ if os.environ.get('GAE_ENV') != 'standard':
     env = data['env_variables']
     MAILGUN_API_KEY = env['MAILGUN_API_KEY']
     MAILGUN_VALIDATION_KEY = env['MAILGUN_VALIDATION_KEY']
-    TYPETALK_TOKEN = env['TYPETALK_TOKEN']
     TYPETALK_CLIENT_ID = env['TYPETALK_CLIENT_ID']
     TYPETALK_CLIENT_SECRET = env['TYPETALK_CLIENT_SECRET']
 
 print('MAILGUN_API_KEY: {}'.format(MAILGUN_API_KEY))
 print('MAILGUN_VALIDATION_KEY: {}'.format(MAILGUN_VALIDATION_KEY))
-print('TYPETALK_TOKEN: {}'.format(TYPETALK_TOKEN))
 print('TYPETALK_CLIENT_ID: {}'.format(TYPETALK_CLIENT_ID))
 print('TYPETALK_CLIENT_SECRET: {}'.format(TYPETALK_CLIENT_SECRET))
 
@@ -52,6 +49,7 @@ def recv_email():
 
     topicid, message = get_message_from_mailgun(message_url)
     print("received message to Typetalk({}): {}".format(topicid, message['msgbody']))
+
     ret = post_to_typetalk(topicid, message)
     print("post to typetalk is succeeded: {}".format(str(ret)))
 
@@ -149,7 +147,8 @@ def parse_topicid_toaddr(toaddr):
 TYPETALK_API_URL = 'https://typetalk.com/api/v1/topics/'
 def post_to_typetalk(topicid, message):
     topicid= 97119
-    headers = {'X-Typetalk-Token': TYPETALK_TOKEN}
+    typetalk_accesstoken = get_typetalk_credential()
+    headers = {'Authorization':'Bearer '+ typetalk_accesstoken}
 
     # upload attachments
     uploaded_filekeys = []
@@ -163,7 +162,7 @@ def post_to_typetalk(topicid, message):
                 uploaded_filekeys.append(json.loads(r.text).get('fileKey'))
 
     # get or create matome
-    talkid = get_or_create_typetalk_matome(topicid, message.get('fromaddr'))
+    talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid, message.get('fromaddr'))
 
     # post message
     postmsg = 'メールを受信しました。\n'
@@ -183,22 +182,20 @@ def post_to_typetalk(topicid, message):
         abort(500, r.text)
     return r.text
 
-
 def get_typetalk_credential(scope='topic.read,topic.post,topic.write'):
-    r = requests.post("https://typetalk.com/oauth2/access_token", {
-            'client_id': TYPETALK_CLIENT_ID,
+    url = "https://typetalk.com/oauth2/access_token"
+    r = requests.post(url, {'client_id': TYPETALK_CLIENT_ID,
             'client_secret': TYPETALK_CLIENT_SECRET,
-            'grant_type': 'client_credentials',
-            'scope': scope})
+            'grant_type': 'client_credentials','scope': scope})
     if r.status_code !=200:
         abort(500, "typetalk api error: status code={}, {}".format(r.status_code, r.text))
 
     return r.json()['access_token']
 
 
-def get_or_create_typetalk_matome(topicid, name):
+def get_or_create_typetalk_matome(typetalk_accesstoken, topicid, name):
     url = TYPETALK_API_URL + str(topicid) + '/talks'
-    headers = {'Authorization':'Bearer '+ get_typetalk_credential()}
+    headers = {'Authorization':'Bearer '+ typetalk_accesstoken}
 
     r = requests.get(url, headers=headers)
     if r.status_code != 200:
