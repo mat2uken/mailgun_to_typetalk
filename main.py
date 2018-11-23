@@ -151,8 +151,8 @@ def post_to_typetalk(topicid, message):
     # post message
     url = TYPETALK_API_URL + str(topicid)
     payload = {'message': message.get('msgbody')}
-    for uf in uploaded_filekeys:
-        payload['fileKeys[0]'] = uf
+    for i, uf in enumerate(uploaded_filekeys):
+        payload['fileKeys[{}]'.format(i)] = uf
     r = requests.post(url, data=payload, headers=headers)
     if r.status_code != 200:
         abort(500, r.text)
