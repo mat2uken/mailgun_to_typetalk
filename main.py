@@ -149,8 +149,16 @@ def post_to_typetalk(topicid, message):
                 uploaded_filekeys.append(json.loads(r.text).get('fileKey'))
 
     # post message
+    postmsg = 'メールを受信しました。\n'
+    postmsg += '`From: {}`\n`件名: {}`\n'.format(
+               message.get('toaddr'), message.get('fromaddr'),
+               message.get('subject'))
+    postmsg += '-' * 60 + '\n'
+    for l in message.get('msgbody').split('\n'):
+        postmsg += '>{}'.format(l)
+
     url = TYPETALK_API_URL + str(topicid)
-    payload = {'message': message.get('msgbody')}
+    payload = {'message': postmsg}
     for i, uf in enumerate(uploaded_filekeys):
         payload['fileKeys[{}]'.format(i)] = uf
     r = requests.post(url, data=payload, headers=headers)
