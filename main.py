@@ -29,7 +29,7 @@ print('TYPETALK_CLIENT_SECRET: {}'.format(TYPETALK_CLIENT_SECRET))
 
 import requests
 import json
-
+from email.utils import parseaddr
 
 @app.route('/')
 def hello():
@@ -66,7 +66,10 @@ def get_message_from_mailgun(message_url):
 
     msgjson = json.loads(message.text)
 
-    fromaddr = msgjson.get('From')
+    fromaddr = msgjson.get('X-Original-From')
+    if fromaddr is None:
+        fromaddr = msgjson.get('From')
+
     toaddr = msgjson.get('To')
     recipients = msgjson.get('recipients')
     sender = msgjson.get('sender')
@@ -109,33 +112,50 @@ attachments: {}""".format(subject, fromaddr, toaddr, body_plain,
     print(log_msg)
 
     return (topicid, dict(subject=subject, fromaddr=fromaddr, toaddr=toaddr,
-                body=body_plain, attachments=attachments))
+            recipients=recipients, body=body_plain, attachments=attachments))
 
 
 def validate_email_address(addr):
     auth = ('api', MAILGUN_VALIDATION_KEY)
     VALIDATION_API_URL = 'https://api.mailgun.net/v3/address/validate'
 
-    import urllib
-    query = urllib.parse.urlencode(dict(address=addr))
-    r = requests.get(VALIDATION_API_URL+'?{}'.format(query), auth=auth)
+    r = requests.get(VALIDATION_API_URL, auth=auth, params={'addresses': addr})
     if r.status_code != 200:
         abort(500, 'error')
 
     return json.loads(r.text)
 
+def parse_email_address(addr):
+    auth = ('api', MAILGUN_VALIDATION_KEY)
+    PARSE_API_URL = 'https://api.mailgun.net/v3/address/parse'
+
+    r = requests.get(PARSE_API_URL, auth=auth, params={'addresses': addr})
+    if r.status_code != 200:
+        abort(500, 'error')
+
+    addrjson = json.loads(r.text)
+
+    addrs = []
+    for paddr in addrjson['parsed']:
+        fullname, addr = parseaddr(paddr)
+        addrs.append(addr)
+
+    if not addrs:
+        abort(500, "From adress prase error: {}".format(addr))
+
+    return addrs
+
+
 def parse_topicid_toaddr(toaddr):
     "Email address validation and extract typetalk topic id by Mailgun API"
 
-    addrjson = validate_email_address(toaddr)
-    parts = addrjson['parts']
-    print('display_name: {}, domain: {}, local_part: {}'.format(
-        parts.get('display_name'), parts.get('domain'), parts.get('local_part')
-    ))
+    addrs = parse_email_address(toaddr)
+    local_part = addrs[0].split('@')[0]
+    print('local_part: {}'.format(local_part))
 
-    local_part = parts.get('local_part')
     if local_part is None:
         abort(500, 'email validation failed?: {}'.format(toaddr))
+
     tidstr = local_part.replace('typetalk-', '')
     topicid = None
     try:
@@ -164,15 +184,12 @@ def post_to_typetalk(topicid, message):
                 uploaded_filekeys.append(json.loads(r.text).get('fileKey'))
 
     # get or create matome
-    addrjson = validate_email_address(message.get('fromaddr'))
-    parts = addrjson['parts']
-    talkname = '{}@{}'.format(parts['local_part'], parts['domain'])
-    from_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid,
-                                                talkname)
+    addrs = parse_email_address(message.get('fromaddr'))
+    from_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid, addrs[0])
 
-    addrjson = validate_email_address(message.get('toaddr'))
+    addrs = parse_email_address(message.get('toaddr'))
     to_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid,
-                                                addrjson['parts']['local_part'])
+                                              addrs[0].split('@')[0])
 
     # post message
     postmsg = 'メールを受信しました。\n'
@@ -182,7 +199,7 @@ def post_to_typetalk(topicid, message):
                message.get('subject'))
     postmsg += '-' * 60 + '\n'
     for l in message.get('body').split('\n'):
-        postmsg += '>{}'.format(l)
+        postmsg += '>{}\n'.format(l)
 
     url = TYPETALK_API_URL + str(topicid)
     payload = {'message': postmsg}
