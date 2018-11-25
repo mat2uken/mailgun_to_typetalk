@@ -187,11 +187,10 @@ def post_to_typetalk(topicid, message):
     addrs = parse_email_address(message.get('toaddr'))
     to_talkid = None
     if addrs:
-        local, domain = addrs.pop(0).split('@')
+        local, domain = addrs[0].split('@')
         if domain == 'shiftall.net':
             talkname = local
-        to_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid,
-                                                  addrs[0].split('@')[0])
+        to_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid, talkname)
 
     # post message
     postmsg = 'メールを受信しました。 --- To: {}\n\n'.format(message.get('toaddr'))
