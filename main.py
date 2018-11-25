@@ -102,14 +102,9 @@ def get_message_from_mailgun(message_url):
         attachments.append(dict(name=name, size=size, content_type=content_type,
                             content=content.content))
 
-    log_msg = """subject: {},
-from: {}, to: {},
----------------------------------------------------
-{}
----------------------------------------------------
-attachments: {}""".format(subject, fromaddr, toaddr, body_plain,
-                              ', '.join([x['name'] for x in attachments]))
-    print(log_msg)
+    print('subject: {}, \nfrom: {}, to: {},\nattachments: {}'.format(
+        subject, fromaddr, toaddr, ', '.join([x['name'] for x in attachments])
+    ))
 
     return (topicid, dict(subject=subject, fromaddr=fromaddr, toaddr=toaddr,
             recipients=recipients, body=body_plain, attachments=attachments))
@@ -151,7 +146,6 @@ def parse_topicid_toaddr(toaddr):
 
     addrs = parse_email_address(toaddr)
     local_part = addrs[0].split('@')[0]
-    print('local_part: {}'.format(local_part))
 
     if local_part is None:
         abort(500, 'email validation failed?: {}'.format(toaddr))
@@ -192,14 +186,12 @@ def post_to_typetalk(topicid, message):
                                               addrs[0].split('@')[0])
 
     # post message
-    postmsg = 'メールを受信しました。\n'
-    postmsg += '`From: {}`\n`To: {}`\n\n`件名: {}`\n'.format(
+    postmsg = 'メールを受信しました。 --- To: {}\n\n'.format(message.get('toaddr'))
+    postmsg += 'From: {}\n件名: 「{}」\n'.format(
                message.get('fromaddr'),
-               message.get('toaddr'),
                message.get('subject'))
-    postmsg += '-' * 60 + '\n'
-    for l in message.get('body').split('\n'):
-        postmsg += '>{}\n'.format(l)
+
+    postmsg += '```\n' + message.get('body') + '\n```\n'
 
     url = TYPETALK_API_URL + str(topicid)
     payload = {'message': postmsg}
