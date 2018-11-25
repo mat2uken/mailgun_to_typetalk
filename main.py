@@ -179,11 +179,19 @@ def post_to_typetalk(topicid, message):
 
     # get or create matome
     addrs = parse_email_address(message.get('fromaddr'))
-    from_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid, addrs[0])
+    from_talkid = None
+    if addrs:
+        talkname = addrs.pop(0)
+        from_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid, talkname)
 
     addrs = parse_email_address(message.get('toaddr'))
-    to_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid,
-                                              addrs[0].split('@')[0])
+    to_talkid = None
+    if addrs:
+        local, domain = addrs.pop(0).split('@')
+        if domain == 'shiftall.net':
+            talkname = local
+        to_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid,
+                                                  addrs[0].split('@')[0])
 
     # post message
     postmsg = 'メールを受信しました。 --- To: {}\n\n'.format(message.get('toaddr'))
@@ -197,8 +205,12 @@ def post_to_typetalk(topicid, message):
     payload = {'message': postmsg}
     for i, uf in enumerate(uploaded_filekeys):
         payload['fileKeys[{}]'.format(i)] = uf
-    payload['talkIds[0]'] = from_talkid
-    payload['talkIds[1]'] = to_talkid
+
+    if from_talkid is not None:
+        payload['talkIds[0]'] = from_talkid
+    if to_talkid is not None:
+        payload['talkIds[1]'] = to_talkid
+
     r = requests.post(url, data=payload, headers=headers)
     if r.status_code != 200:
         abort(500, r.text)
