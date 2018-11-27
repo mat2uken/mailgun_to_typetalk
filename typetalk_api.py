@@ -6,6 +6,9 @@ import requests
 from requests import Request
 from email.utils import parseaddr
 
+#import logging
+#logging.basicConfig(level=logging.DEBUG)
+
 def validate_email_address(addr):
     auth = ('api', MAILGUN_VALIDATION_KEY)
     VALIDATION_API_URL = 'https://api.mailgun.net/v3/address/validate'
@@ -65,13 +68,13 @@ class TypetalkAPI(object):
         self.token = self.get_credential()
         self.topic_id = topic_id
 
-    def _request(self, url, params=None, files=None, method='GET'):
+    def _request(self, url, params=None, data=None, files=None, method='GET'):
         headers = {'Authorization':'Bearer '+ self.token}
-        r = requests.request(method, url, params=params, files=files, headers=headers)
+        r = requests.request(method, url, params=params, data=data, files=files, headers=headers)
         if r.status_code == 404:
             return None
         elif r.status_code != 200:
-            raise TypetalkException('typetalk api error: {}'.format(r.text))
+            raise TypetalkException('typetalk api error: status={}, \n{}'.format(r.status_code, r.text))
 
         return r.json()
 
@@ -86,7 +89,7 @@ class TypetalkAPI(object):
                  'client_secret': TYPETALK_CLIENT_SECRET,
                  'grant_type': 'client_credentials','scope': scope})
         if r.status_code !=200:
-            raise TypetalkException("typetalk api error: status code={}, {}".format(r.status_code, r.text))
+            raise TypetalkException("typetalk api error: status={}, {}".format(r.status_code, r.text))
 
         return r.json()['access_token']
 
@@ -125,7 +128,8 @@ class TypetalkAPI(object):
             return talk_id
 
         url = self._build_topic_api_url() + '/talks'
-        talkjson = self._request(url, {'talkName': name}, method='POST')
+        print('creating matome: {}, talkName: {}'.format(url, name))
+        talkjson = self._request(url, data={'talkName': name}, method='POST')
         return talkjson['talk']['id']
 
 
@@ -212,4 +216,4 @@ class TypetalkAPI(object):
                      payload['replayTo'] = msgid
                      break
 
-        return self._request(url, params=payload, method='POST')
+        return self._request(url, data=payload, method='POST')
