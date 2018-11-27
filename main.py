@@ -12,6 +12,7 @@ MAILGUN_API_KEY = os.environ.get('MAILGUN_API_KEY')
 MAILGUN_VALIDATION_KEY = os.environ.get('MAILGUN_VALIDATION_KEY')
 TYPETALK_CLIENT_ID = os.environ.get('TYPETALK_CLIENT_ID')
 TYPETALK_CLIENT_SECRET = os.environ.get('TYPETALK_CLIENT_SECRET')
+TYPETALK_BOT_POST_URL = os.environ.get('TYPETALK_BOT_POST_URL')
 
 if os.environ.get('GAE_ENV') != 'standard':
     import yaml
@@ -21,11 +22,13 @@ if os.environ.get('GAE_ENV') != 'standard':
     MAILGUN_VALIDATION_KEY = env['MAILGUN_VALIDATION_KEY']
     TYPETALK_CLIENT_ID = env['TYPETALK_CLIENT_ID']
     TYPETALK_CLIENT_SECRET = env['TYPETALK_CLIENT_SECRET']
+    TYPETALK_BOT_POST_URL = env['TYPETALK_BOT_POST_URL']
 
 print('MAILGUN_API_KEY: {}'.format(MAILGUN_API_KEY))
 print('MAILGUN_VALIDATION_KEY: {}'.format(MAILGUN_VALIDATION_KEY))
 print('TYPETALK_CLIENT_ID: {}'.format(TYPETALK_CLIENT_ID))
 print('TYPETALK_CLIENT_SECRET: {}'.format(TYPETALK_CLIENT_SECRET))
+print('TYPETALK_BOT_POST_URL: {}'.format(TYPETALK_BOT_POST_URL))
 
 import requests
 import json
@@ -41,20 +44,27 @@ def hello():
 def recv_email():
     "Receive from mailgun as HTTP request"
 
-    message_id = request.form.get('Message-Id')
-    print('Start processing message: {}'.format(message_id))
+    try:
+        message_id = request.form.get('Message-Id')
+        print('Start processing message: {}'.format(message_id))
 
-    message_url = request.form.get('message-url')
-    print('notified message-url: {}'.format(message_url))
+        message_url = request.form.get('message-url')
+        print('notified message-url: {}'.format(message_url))
 
-    topicid, message = get_message_from_mailgun(message_url)
-    print("received message to Typetalk({}): {}".format(topicid, message['body']))
+        topicid, message = get_message_from_mailgun(message_url)
+        print("received message to Typetalk({}): {}".format(topicid, message['body']))
 
-    ret = post_to_typetalk(topicid, message)
-    print("post to typetalk is succeeded: {}".format(str(ret)))
+        ret = post_to_typetalk(topicid, message)
+        print("post to typetalk is succeeded: {}".format(str(ret)))
+    except Exception as e:
+        import traceback
+        post_text_to_typetalk(traceback.format(e))
 
     return 'OK'
 
+def post_text_to_typetalk(message):
+    print('post text(simple): {}'.format(message))
+    requests.post(TYPETALK_BOT_POST_URL, {'message': message})
 
 def get_message_from_mailgun(message_url):
     "Get message and attachments from Mailgun API"
@@ -85,8 +95,9 @@ def get_message_from_mailgun(message_url):
     else:
         print("Target topic id: {}".format(topicid))
 
-    body_plain = msgjson.get('body-plain')
-    stripped_text = msgjson.get('stripped-text')
+    body = msgjson.get('stripped-text')
+    if body is None:
+        body = msgjson.get('body-plain')
 
     attachments = []
     for attachment in msgjson.get('attachments'):
@@ -107,7 +118,7 @@ def get_message_from_mailgun(message_url):
     ))
 
     return (topicid, dict(subject=subject, fromaddr=fromaddr, toaddr=toaddr,
-            recipients=recipients, body=body_plain, attachments=attachments))
+            recipients=recipients, body=body, attachments=attachments))
 
 
 def validate_email_address(addr):
@@ -126,7 +137,7 @@ def parse_email_address(addr):
 
     r = requests.get(PARSE_API_URL, auth=auth, params={'addresses': addr})
     if r.status_code != 200:
-        abort(500, 'error')
+        abort(500, "parse addr error: {}".format(addr))
 
     addrjson = json.loads(r.text)
 
@@ -136,7 +147,9 @@ def parse_email_address(addr):
         addrs.append(addr)
 
     if not addrs:
-        abort(500, "From adress prase error: {}".format(addr))
+        for paddr in addrjson['unparseable']:
+            fullname, addr = parseaddr(paddr)
+            addrs.append(addr)
 
     return addrs
 
@@ -162,7 +175,6 @@ def parse_topicid_toaddr(toaddr):
 
 TYPETALK_API_URL = 'https://typetalk.com/api/v1/topics/'
 def post_to_typetalk(topicid, message):
-    topicid= 97119
     typetalk_accesstoken = get_typetalk_credential()
     headers = {'Authorization':'Bearer '+ typetalk_accesstoken}
 
@@ -186,9 +198,10 @@ def post_to_typetalk(topicid, message):
 
     addrs = parse_email_address(message.get('toaddr'))
     to_talkid = None
+    print("to_talkid addrs: {}".format(addrs))
     if addrs:
         local, domain = addrs[0].split('@')
-        if domain == 'shiftall.net':
+        if 'shiftall.net' in domain:
             talkname = local
         to_talkid = get_or_create_typetalk_matome(typetalk_accesstoken, topicid, talkname)
 
