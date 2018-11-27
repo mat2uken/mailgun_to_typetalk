@@ -170,7 +170,7 @@ class TypetalkAPI(object):
                 to_talkid = self.get_or_create_matome(addrs[0])
 
         message_id = message.get('message_id').split('@')[0][1:]
-        if len(message_id) >= 64: message_id = message_id[:63]
+        if len(message_id) > 64: message_id = message_id[:64]
         message_id_talkid = None
         if message_id is not None:
             message_id_talkid = self.get_or_create_matome(message_id)
@@ -180,7 +180,10 @@ class TypetalkAPI(object):
         postmsg += 'From: {}\n件名: 「{}」\n'.format(
                    message.get('fromaddr'),
                    message.get('subject'))
-        postmsg += '```\n' + message.get('body') + '\n```\n'
+
+        body = message.get('body')
+        if len(body) > 3800: body = body[:3800]
+        postmsg += '```\n' + body + '\n```\n'
 
         payload = {'message': postmsg}
         for i, uf in enumerate(uploaded_filekeys):
@@ -197,13 +200,13 @@ class TypetalkAPI(object):
         references = message.get('references')
         if in_reply_to is not None:
             in_reply_to_id = in_reply_to.split('@')[0][1:]
-            if len(in_reply_to_id) >= 64: message_id = message_id[:63]
+            if len(in_reply_to_id) > 64: message_id = message_id[:64]
             payload['replyTo'] = self.get_message_id_in_matome(in_reply_to_id)
         else:
             if references is not None:
                 for ref in references.split():
                      ref_id = ref.split('@')[0][1:]
-                     if len(ref_id) >= 64: ref_id[:63]
+                     if len(ref_id) > 64: ref_id[:64]
                      msgid = self.get_message_id_in_matome(ref_id)
                      if msgid is None:
                           continue

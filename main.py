@@ -37,7 +37,7 @@ def recv_email():
         print("post to typetalk is succeeded: {}".format(str(ret)))
     except Exception as e:
         import traceback
-        post_text_to_typetalk(traceback.format_exc(e))
+        post_text_to_typetalk(traceback.format_exc())
 
     return 'OK'
 
