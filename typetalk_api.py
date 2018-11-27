@@ -67,6 +67,7 @@ class TypetalkAPI(object):
     def __init__(self, topic_id):
         self.token = self.get_credential()
         self.topic_id = topic_id
+        self.cached_talks = None
 
     def _request(self, url, params=None, data=None, files=None, method='GET'):
         headers = {'Authorization':'Bearer '+ self.token}
@@ -95,9 +96,11 @@ class TypetalkAPI(object):
 
 
     def get_matome(self, name):
-        url = self._build_topic_api_url() + '/talks'
-        talksjson = self._request(url)
-        for talk in talksjson['talks']:
+        if self.cached_talks is None:
+            url = self._build_topic_api_url() + '/talks'
+            self.cached_talks = self._request(url)
+
+        for talk in self.cached_talks['talks']:
             if talk['name'] == name:
                 return talk['id']
 
@@ -130,6 +133,7 @@ class TypetalkAPI(object):
         url = self._build_topic_api_url() + '/talks'
         print('creating matome: {}, talkName: {}'.format(url, name))
         talkjson = self._request(url, data={'talkName': name}, method='POST')
+        self.cached_talks = None
         return talkjson['talk']['id']
 
 
