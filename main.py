@@ -7,7 +7,6 @@ from flask import abort, request
 app = Flask(__name__)
 
 import requests
-import json
 
 from localenv import *
 
@@ -54,7 +53,7 @@ def get_message_from_mailgun(message_url):
     if message.status_code != 200:
         abort(500, "cannnot get message from mailgun: {}".format(message_url))
 
-    msgjson = json.loads(message.text)
+    msgjson = message.json()
 
     fromaddr = msgjson.get('X-Original-From')
     if fromaddr is None:

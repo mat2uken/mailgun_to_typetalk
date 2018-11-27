@@ -4,7 +4,6 @@ from localenv import *
 
 import requests
 from requests import Request
-import json
 from email.utils import parseaddr
 
 def validate_email_address(addr):
@@ -13,9 +12,9 @@ def validate_email_address(addr):
 
     r = requests.get(VALIDATION_API_URL, auth=auth, params={'addresses': addr})
     if r.status_code != 200:
-        abort(500, 'error')
+        raise TypetalkException('mailgun validation api error: {}'.format(r.text))
 
-    return json.loads(r.text)
+    return r.json()
 
 def parse_email_address(addr):
     auth = ('api', MAILGUN_VALIDATION_KEY)
@@ -23,10 +22,9 @@ def parse_email_address(addr):
 
     r = requests.get(PARSE_API_URL, auth=auth, params={'addresses': addr})
     if r.status_code != 200:
-        abort(500, "parse addr error: {}".format(addr))
+        raise TypetalkException("mailgun parse addr api error: {}".format(addr))
 
-    addrjson = json.loads(r.text)
-
+    addrjson = r.json()
     addrs = []
     for paddr in addrjson['parsed']:
         fullname, addr = parseaddr(paddr)
@@ -57,6 +55,9 @@ def get_topic_id_from_toaddr(toaddr):
 
     return topicid
 
+class TypetalkException(Exception):
+    pass
+
 TYPETALK_API_PREFIX = 'https://typetalk.com/api/v1'
 TYPETALK_API_TOPIC_URL = TYPETALK_API_PREFIX + '/topics'
 class TypetalkAPI(object):
@@ -70,7 +71,7 @@ class TypetalkAPI(object):
         if r.status_code == 404:
             return None
         elif r.status_code != 200:
-            abort(500, 'typetalk api error: {}'.format(r.text))
+            raise TypetalkException('typetalk api error: {}'.format(r.text))
 
         return r.json()
 
@@ -85,7 +86,7 @@ class TypetalkAPI(object):
                  'client_secret': TYPETALK_CLIENT_SECRET,
                  'grant_type': 'client_credentials','scope': scope})
         if r.status_code !=200:
-            abort(500, "typetalk api error: status code={}, {}".format(r.status_code, r.text))
+            raise TypetalkException("typetalk api error: status code={}, {}".format(r.status_code, r.text))
 
         return r.json()['access_token']
 
