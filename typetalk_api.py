@@ -47,14 +47,14 @@ def get_topic_id_from_toaddr(toaddr):
     local_part = addrs[0].split('@')[0]
 
     if local_part is None:
-        abort(500, 'email validation failed?: {}'.format(toaddr))
+        raise TypetalkException('email validation failed?: {}'.format(toaddr))
 
     tidstr = local_part.replace('typetalk-', '')
     topicid = None
     try:
         topicid = int(tidstr)
     except ValueError as e:
-        abort(500, 'from address cannot parse as topicid: {}'.format(toaddr))
+        raise TypetalkException('from address cannot parse as topicid: {}'.format(toaddr))
 
     return topicid
 
@@ -154,16 +154,16 @@ class TypetalkAPI(object):
         addrs = parse_email_address(message.get('fromaddr'))
         from_talkid = None
         if addrs:
-            talkname = addrs.pop(0)
-            from_talkid = self.get_or_create_matome(talkname)
+            local, domain = addrs[0].split('@')
+            if 'shiftall.net' not in domain:
+                from_talkid = self.get_or_create_matome(addrs[0])
 
         addrs = parse_email_address(message.get('toaddr'))
         to_talkid = None
         if addrs:
             local, domain = addrs[0].split('@')
-            if 'shiftall.net' in domain:
-                talkname = local
-            to_talkid = self.get_or_create_matome(talkname)
+            if 'shiftall.net' not in domain:
+                to_talkid = self.get_or_create_matome(addrs[0])
 
         message_id = message.get('message_id').split('@')[0][1:]
         if len(message_id) >= 64: message_id = message_id[:63]
@@ -177,19 +177,7 @@ class TypetalkAPI(object):
                    message.get('fromaddr'),
                    message.get('subject'))
         postmsg += '```\n' + message.get('body') + '\n```\n'
-        postmsg += 'Message-ID: {}\n'.format(message.get('message_id'))
 
-        in_reply_to = message.get('in_reply_to')
-        if in_reply_to is not None:
-            postmsg += 'In-Reply-To: {}\n'.format(in_reply_to)
-
-        references = message.get('references')
-        if references is not None:
-            postmsg += ' References:\n{}\n'.format(
-                '\n'.join(['\t'+x for x in references.split()])
-            )
-
-        url = self._build_topic_api_url()
         payload = {'message': postmsg}
         for i, uf in enumerate(uploaded_filekeys):
             payload['fileKeys[{}]'.format(i)] = uf
@@ -201,6 +189,8 @@ class TypetalkAPI(object):
         if message_id_talkid is not None:
             payload['talkIds[2]'] = message_id_talkid
 
+        in_reply_to = message.get('in_reply_to')
+        references = message.get('references')
         if in_reply_to is not None:
             in_reply_to_id = in_reply_to.split('@')[0][1:]
             if len(in_reply_to_id) >= 64: message_id = message_id[:63]
@@ -216,4 +206,5 @@ class TypetalkAPI(object):
                      payload['replayTo'] = msgid
                      break
 
+        url = self._build_topic_api_url()
         return self._request(url, data=payload, method='POST')
