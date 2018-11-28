@@ -137,7 +137,7 @@ class TypetalkAPI(object):
         return talkjson['talk']['id']
 
 
-    def post_message(self, message):
+    def post_message(self, message, message_url=None):
         topic = self.get_topic_detail()
         if topic is None:
             print("topic is not found. change topic id to default(97119)")
@@ -182,8 +182,22 @@ class TypetalkAPI(object):
                    message.get('subject'))
 
         body = message.get('body')
-        if len(body) > 3800: body = body[:3800]
+        view_message_continue = None
+        if len(body) > 3800:
+            body = body[:3800] + '\n'
+
+        from urllib.parse import urlparse
+        o = urlparse(message_url)
+        message_url_last = o.path.split('/')[-1]
+        view_message_continue = '[>>>全文(text)を見る]({}?ddomain={}&msg_id={})\n'.format(
+            VIEW_MESSAGE_CONTINUE_URL,
+            o.netloc,
+            message_url_last
+        )
+
         postmsg += '```\n' + body + '\n```\n'
+        if view_message_continue is not None:
+            postmsg += view_message_continue + '\n'
 
         payload = {'message': postmsg}
         for i, uf in enumerate(uploaded_filekeys):

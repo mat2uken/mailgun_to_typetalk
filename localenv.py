@@ -2,6 +2,10 @@
 
 import os
 
+VIEW_MESSAGE_CONTINUE_URL = 'https://typetalktools.appspot.com/view_message'
+
+MAILGUN_DOMAIN = 'mailgun-mx.nonefix.org'
+
 MAILGUN_API_KEY = os.environ.get('MAILGUN_API_KEY')
 MAILGUN_VALIDATION_KEY = os.environ.get('MAILGUN_VALIDATION_KEY')
 TYPETALK_CLIENT_ID = os.environ.get('TYPETALK_CLIENT_ID')

@@ -1,5 +1,5 @@
 # [START gae_python37_app]
-from flask import Flask
+from flask import Flask, Response
 from flask import abort, request
 
 # If `entrypoint` is not defined in app.yaml, App Engine will look for an app
@@ -33,13 +33,31 @@ def recv_email():
         topic_id, message = get_message_from_mailgun(message_url)
         print("received message to Typetalk(topic id:{})".format(topic_id))
 
-        ret = TypetalkAPI(topic_id).post_message(message)
+        ret = TypetalkAPI(topic_id).post_message(message, message_url=message_url)
         print("post to typetalk is succeeded: {}".format(str(ret)))
     except Exception as e:
         import traceback
         post_text_to_typetalk(traceback.format_exc())
 
     return 'OK'
+
+@app.route('/view_message', methods=['GET'])
+def view_message():
+    msg_id = request.args.get('msg_id')
+    ddomain = request.args.get('ddomain')
+
+    MAILGUN_MESSAGE_URL = 'https://{}/v3/domains/{}/messages/'.format(
+        ddomain,
+        MAILGUN_DOMAIN
+    )
+
+    print('mailgun msg url: {}'.format(MAILGUN_MESSAGE_URL + msg_id))
+
+    auth = ('api', MAILGUN_API_KEY)
+    r = requests.get(MAILGUN_MESSAGE_URL + msg_id, auth=auth)
+    if r.status_code != 200:
+        abort(404, 'message is not found: {}'.format(r.text))
+    return Response(r.json().get('body-plain'), mimetype='text/plain')
 
 def post_text_to_typetalk(text):
     print('post text(simple): {}'.format(text))
