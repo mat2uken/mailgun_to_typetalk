@@ -2,8 +2,9 @@
 
 from localenv import *
 
+import re
 import requests
-from requests import Request
+from requests import Request, Session
 from email.utils import parseaddr
 
 #import logging
@@ -69,9 +70,27 @@ class TypetalkAPI(object):
         self.topic_id = topic_id
         self.cached_talks = None
 
-    def _request(self, url, params=None, data=None, files=None, method='GET'):
+    def _upload_request(self, url, files):
         headers = {'Authorization':'Bearer '+ self.token}
-        r = requests.request(method, url, params=params, data=data, files=files, headers=headers)
+
+        filename = files['file'][0]
+
+        def hack_filename_encode(prepared_request):
+            prepared_request.body = re.sub(b'filename\*=.*', b'filename=' + filename.encode('utf-8'), prepared_request.body)
+            return prepared_request
+
+        r = requests.post(url, files=files, headers=headers, auth=hack_filename_encode)
+        if r.status_code == 404:
+            return None
+        elif r.status_code != 200:
+            raise TypetalkException('typetalk api error: status={}, \n{}'.format(r.status_code, r.text))
+
+        return r.json()
+
+
+    def _request(self, url, params=None, data=None, method='GET'):
+        headers = {'Authorization':'Bearer '+ self.token}
+        r = requests.request(method, url, params=params, data=data, headers=headers)
         if r.status_code == 404:
             return None
         elif r.status_code != 200:
@@ -150,7 +169,8 @@ class TypetalkAPI(object):
             for a in attachments:
                 url = self._build_topic_api_url() + '/attachments'
                 payload = {'file': (a['name'], a['content'], a['content_type'])}
-                r = self._request(url, files=payload, method='POST')
+
+                r = self._upload_request(url, files=payload)
                 if r is not None:
                     uploaded_filekeys.append(r.get('fileKey'))
 

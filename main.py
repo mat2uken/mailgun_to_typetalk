@@ -113,6 +113,7 @@ def get_message_from_mailgun(message_url):
         size = attachment.get('size')
         name = attachment.get('name')
         url = attachment.get('url')
+        print('got attachment: name={}, size={}'.format(name, size))
 
         content = None
         if url is not None:
