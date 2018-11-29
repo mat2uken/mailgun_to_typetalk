@@ -186,14 +186,14 @@ class TypetalkAPI(object):
         if len(body) > 3800:
             body = body[:3800] + '\n'
 
-        from urllib.parse import urlparse
-        o = urlparse(message_url)
-        message_url_last = o.path.split('/')[-1]
-        view_message_continue = '[>>>全文(text)を見る]({}?ddomain={}&msg_id={})\n'.format(
-            VIEW_MESSAGE_CONTINUE_URL,
-            o.netloc,
-            message_url_last
-        )
+            if message_url is not None:
+                from urllib.parse import urlparse
+                o = urlparse(message_url)
+                message_url_last = o.path.split('/')[-1]
+                view_message_continue = '[>>>全文(text)を見る]({}?ddomain={}&msg_id={})\n'.format(
+                    VIEW_MESSAGE_CONTINUE_URL,
+                    o.netloc, message_url_last
+                )
 
         postmsg += '```\n' + body + '\n```\n'
         if view_message_continue is not None:

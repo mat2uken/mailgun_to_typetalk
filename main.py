@@ -23,6 +23,8 @@ def hello():
 def recv_email():
     "Receive from mailgun as HTTP request"
 
+    message_id = None
+    message_url = None
     try:
         message_id = request.form.get('Message-Id')
         print('Start processing message: {}'.format(message_id))
@@ -37,7 +39,9 @@ def recv_email():
         print("post to typetalk is succeeded: {}".format(str(ret)))
     except Exception as e:
         import traceback
-        post_text_to_typetalk(traceback.format_exc())
+        exception_msg = traceback.format_exc()
+        post_text_to_typetalk(message_id, message_url, exception_msg)
+        abort(500, exception_msg)
 
     return 'OK'
 
