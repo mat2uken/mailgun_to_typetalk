@@ -183,8 +183,8 @@ class TypetalkAPI(object):
 
         body = message.get('body')
         view_message_continue = None
-        if len(body) > 3800:
-            body = body[:3800] + '\n'
+        if len(body) > 3500:
+            body = body[:3500] + '\n'
 
             if message_url is not None:
                 from urllib.parse import urlparse
