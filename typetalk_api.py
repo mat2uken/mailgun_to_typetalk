@@ -6,13 +6,14 @@ import re
 import requests
 from requests import Request, Session
 from email.utils import parseaddr
+from urllib.parse import urlencode
 
 #import logging
 #logging.basicConfig(level=logging.DEBUG)
 
 def validate_email_address(addr):
     auth = ('api', MAILGUN_VALIDATION_KEY)
-    VALIDATION_API_URL = 'https://api.mailgun.net/v3/address/validate'
+    VALIDATION_API_URL = 'https://api.mailgun.net/v3/address/private/validate'
 
     r = requests.get(VALIDATION_API_URL, auth=auth, params={'addresses': addr})
     if r.status_code != 200:
@@ -22,12 +23,11 @@ def validate_email_address(addr):
 
 def parse_email_address(addr):
     auth = ('api', MAILGUN_VALIDATION_KEY)
-    PARSE_API_URL = 'https://api.mailgun.net/v3/address/parse'
+    PARSE_API_URL = 'https://api.mailgun.net/v3/address/private/parse'
 
     r = requests.get(PARSE_API_URL, auth=auth, params={'addresses': addr})
     if r.status_code != 200:
         raise TypetalkException("mailgun parse addr api error: {}".format(addr))
-
     addrjson = r.json()
     addrs = []
     for paddr in addrjson['parsed']:
@@ -216,14 +216,11 @@ class TypetalkAPI(object):
         view_message_continue = None
         if len(body) > 3500:
             body = body[:3500] + '\n'
-
             if message_url is not None:
-                from urllib.parse import urlparse
-                o = urlparse(message_url)
-                message_url_last = o.path.split('/')[-1]
-                view_message_continue = '[>>>全文(text)を見る]({}?ddomain={}&msg_id={})\n'.format(
-                    VIEW_MESSAGE_CONTINUE_URL,
-                    o.netloc, message_url_last
+                query = urlencode({'message_id': message.get('message_id')})
+                view_message_continue = \
+                '''省略されました。 [>>>全文(text)を見る]({})\n'''.format(
+                    VIEW_MESSAGE_CONTINUE_URL+'?{}'.format(query)
                 )
 
         postmsg += '```\n' + body + '\n```\n'
@@ -238,6 +235,8 @@ class TypetalkAPI(object):
             payload['talkIds[0]'] = from_talkid
         if to_talkid is not None:
             payload['talkIds[1]'] = to_talkid
+        if view_message_continue is not None:
+            payload['showLinkMeta'] = 'false'
 
         ms = MessageStore()
         in_reply_to = message.get('in_reply_to')

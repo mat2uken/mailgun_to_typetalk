@@ -66,18 +66,16 @@ def recv_email():
 
 @app.route('/view_message', methods=['GET'])
 def view_message():
-    msg_id = request.args.get('msg_id')
-    ddomain = request.args.get('ddomain')
+    message_id = request.args.get('message_id')
 
-    MAILGUN_MESSAGE_URL = 'https://{}/v3/domains/{}/messages/'.format(
-        ddomain,
-        MAILGUN_DOMAIN
-    )
+    ms = MessageStore()
+    message_entity = ms.get_entity(message_id)
+    message_url = message_entity['msg_url']
 
-    print('mailgun msg url: {}'.format(MAILGUN_MESSAGE_URL + msg_id))
+    print('mailgun msg url: {}'.format(message_url))
 
     auth = ('api', MAILGUN_API_KEY)
-    r = requests.get(MAILGUN_MESSAGE_URL + msg_id, auth=auth)
+    r = requests.get(message_url, auth=auth)
     if r.status_code != 200:
         abort(404, 'message is not found: {}'.format(r.text))
     return Response(r.json().get('body-plain'), mimetype='text/plain')
