@@ -6,5 +6,12 @@ url = 'https://sw.api.mailgun.net/v3/domains/mailgun-mx.nonefix.org/messages/eyJ
 topic_id, message = main.get_message_from_mailgun(url)
 
 topic_id = 97119
-TypetalkAPI(topic_id).post_message(message, url)
+ret = TypetalkAPI(topic_id).post_message(message, url)
+
+post = ret.get('post')
+if post is not None:
+    post_id = post.get('id')
+if post_id is not None:
+    main.save_msg_to_cloud_store(1234, url, post_id)
+    print('saved to cloud store')
 

@@ -59,6 +59,23 @@ def get_topic_id_from_toaddr(toaddr):
 
     return topicid
 
+from google.cloud import datastore
+class MessageStore(object):
+    def __init__(self):
+        self.client = datastore.Client()
+
+    def save(self, msg_id, msg_url, typetalk_msg_id):
+        entity_key = self.client.key(CLOUD_STORE_KIND, msg_id)
+        msg = datastore.Entity(entity_key)
+        msg['msg_id'] = msg_id
+        msg['msg_url'] = msg_url
+        msg['typetalk_post_id'] = typetalk_msg_id
+        self.client.put(msg)
+
+    def get_entity(self, msg_id):
+        entity_key = self.client.key(CLOUD_STORE_KIND, msg_id)
+        return self.client.get(entity_key)
+
 class TypetalkException(Exception):
     pass
 
@@ -189,12 +206,6 @@ class TypetalkAPI(object):
             if 'shiftall.net' not in domain:
                 to_talkid = self.get_or_create_matome(addrs[0])
 
-        message_id = message.get('message_id').split('@')[0][1:]
-        if len(message_id) > 64: message_id = message_id[:64]
-        message_id_talkid = None
-        if message_id is not None:
-            message_id_talkid = self.get_or_create_matome(message_id)
-
         # post message
         postmsg = 'メールを受信しました。 --- To: {}\n\n'.format(message.get('toaddr'))
         postmsg += 'From: {}\n件名: 「{}」\n'.format(
@@ -227,25 +238,21 @@ class TypetalkAPI(object):
             payload['talkIds[0]'] = from_talkid
         if to_talkid is not None:
             payload['talkIds[1]'] = to_talkid
-        if message_id_talkid is not None:
-            payload['talkIds[2]'] = message_id_talkid
 
+        ms = MessageStore()
         in_reply_to = message.get('in_reply_to')
         references = message.get('references')
         if in_reply_to is not None:
-            in_reply_to_id = in_reply_to.split('@')[0][1:]
-            if len(in_reply_to_id) > 64: message_id = message_id[:64]
-            payload['replyTo'] = self.get_message_id_in_matome(in_reply_to_id)
+            message_entity = ms.get_entity(in_reply_to)
+            if message_entity is not None:
+                payload['replyTo'] = message_entity['typetalk_post_id']
         else:
             if references is not None:
                 for ref in references.split():
-                     ref_id = ref.split('@')[0][1:]
-                     if len(ref_id) > 64: ref_id[:64]
-                     msgid = self.get_message_id_in_matome(ref_id)
-                     if msgid is None:
-                          continue
-                     payload['replayTo'] = msgid
-                     break
+                    if ref == message_entity['mesg_id']:
+                        message_entity = ms.get_entity(ref)
+                        payload['replayTo'] = message_entity['typetalk_post_id']
+                        break
 
         url = self._build_topic_api_url()
         return self._request(url, data=payload, method='POST')

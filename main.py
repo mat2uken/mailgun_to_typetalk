@@ -11,13 +11,24 @@ import requests
 from localenv import *
 
 import typetalk_api
-from typetalk_api import TypetalkAPI
+from typetalk_api import TypetalkAPI, MessageStore
 
 @app.route('/')
 def hello():
     """Return a friendly HTTP greeting."""
     return 'Hello World!'
 
+@app.route('/dstore/set')
+def datastore_set():
+    ms = MessageStore()
+    ms.save('1234', '3456', '5678')
+
+    return 'write ok'
+
+@app.route('/dstore/get')
+def datastore_get():
+    ms = MessageStore()
+    return ms.get_entity('1234')['typetalk_msg_id']
 
 @app.route('/recv_email', methods=['POST'])
 def recv_email():
@@ -35,8 +46,16 @@ def recv_email():
         topic_id, message = get_message_from_mailgun(message_url)
         print("received message to Typetalk(topic id:{})".format(topic_id))
 
+
         ret = TypetalkAPI(topic_id).post_message(message, message_url=message_url)
         print("post to typetalk is succeeded: {}".format(str(ret)))
+
+        post = ret.get('post')
+        if post is not None:
+            post_id = post.get('id')
+        if post_id is not None:
+            save_msg_to_cloud_store(message_id, message_url, post_id)
+            print('saved to cloud store: {}'.format(message_id))
     except Exception as e:
         import traceback
         exception_msg = traceback.format_exc()
@@ -63,9 +82,16 @@ def view_message():
         abort(404, 'message is not found: {}'.format(r.text))
     return Response(r.json().get('body-plain'), mimetype='text/plain')
 
-def post_text_to_typetalk(text):
+def save_msg_to_cloud_store(message_id, message_url, post_id):
+    ms = MessageStore()
+    return ms.save(message_id, message_url, post_id)
+
+def post_text_to_typetalk(message_id, message_url, text):
+    print('message id: {}, url: {}'.format(message_id, message_url))
     print('post text(simple): {}'.format(text))
-    requests.post(TYPETALK_BOT_POST_URL, {'message': text})
+
+    msg = '''Message-ID: {}\nMessage-URL : {}\n{}'''.format(message_id, message_url, text)
+    requests.post(TYPETALK_BOT_POST_URL, {'message': msg})
 
 def get_message_from_mailgun(message_url):
     "Get message and attachments from Mailgun API"
