@@ -18,18 +18,6 @@ def hello():
     """Return a friendly HTTP greeting."""
     return 'Hello World!'
 
-@app.route('/dstore/set')
-def datastore_set():
-    ms = MessageStore()
-    ms.save('1234', '3456', '5678')
-
-    return 'write ok'
-
-@app.route('/dstore/get')
-def datastore_get():
-    ms = MessageStore()
-    return ms.get_entity('1234')['typetalk_msg_id']
-
 @app.route('/recv_email', methods=['POST'])
 def recv_email():
     "Receive from mailgun as HTTP request"

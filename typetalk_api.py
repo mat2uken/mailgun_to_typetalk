@@ -191,21 +191,6 @@ class TypetalkAPI(object):
                 if r is not None:
                     uploaded_filekeys.append(r.get('fileKey'))
 
-        # get or create matome
-        addrs = parse_email_address(message.get('fromaddr'))
-        from_talkid = None
-        if addrs:
-            local, domain = addrs[0].split('@')
-            if 'shiftall.net' not in domain:
-                from_talkid = self.get_or_create_matome(addrs[0])
-
-        addrs = parse_email_address(message.get('toaddr'))
-        to_talkid = None
-        if addrs:
-            local, domain = addrs[0].split('@')
-            if 'shiftall.net' not in domain:
-                to_talkid = self.get_or_create_matome(addrs[0])
-
         # post message
         postmsg = 'メールを受信しました。 --- To: {}\n\n'.format(message.get('toaddr'))
         postmsg += 'From: {}\n件名: 「{}」\n'.format(
@@ -231,10 +216,6 @@ class TypetalkAPI(object):
         for i, uf in enumerate(uploaded_filekeys):
             payload['fileKeys[{}]'.format(i)] = uf
 
-        if from_talkid is not None:
-            payload['talkIds[0]'] = from_talkid
-        if to_talkid is not None:
-            payload['talkIds[1]'] = to_talkid
         if view_message_continue is not None:
             payload['showLinkMeta'] = 'false'
 
