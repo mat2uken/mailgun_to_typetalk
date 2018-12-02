@@ -34,12 +34,13 @@ class MessageStore(object):
     def __init__(self):
         self.client = datastore.Client()
 
-    def save(self, msg_id, msg_url, typetalk_msg_id):
+    def save(self, msg_id, msg_url, typetalk_post_id):
         entity_key = self.client.key(CLOUD_STORE_KIND, msg_id)
-        msg = datastore.Entity(entity_key)
+        msg = datastore.Entity(entity_key,
+                exclude_from_indexes=('msg_url', 'typetalk_post_id'))
         msg['msg_id'] = msg_id
         msg['msg_url'] = msg_url
-        msg['typetalk_post_id'] = typetalk_msg_id
+        msg['typetalk_post_id'] = typetalk_post_id
         self.client.put(msg)
 
     def get_entity(self, msg_id):
