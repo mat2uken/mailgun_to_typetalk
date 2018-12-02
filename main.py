@@ -18,6 +18,7 @@ def hello():
     """Return a friendly HTTP greeting."""
     return 'Hello World!'
 
+
 @app.route('/recv_email', methods=['POST'])
 def recv_email():
     "Receive from mailgun as HTTP request"
@@ -52,6 +53,7 @@ def recv_email():
 
     return 'OK'
 
+
 @app.route('/view_message', methods=['GET'])
 def view_message():
     message_id = request.args.get('message_id')
@@ -68,9 +70,11 @@ def view_message():
         abort(404, 'message is not found: {}'.format(r.text))
     return Response(r.json().get('body-plain'), mimetype='text/plain')
 
+
 def save_msg_to_cloud_store(message_id, message_url, post_id):
     ms = MessageStore()
     return ms.save(message_id, message_url, post_id)
+
 
 def post_text_to_typetalk(message_id, message_url, text):
     print('message id: {}, url: {}'.format(message_id, message_url))
@@ -78,6 +82,7 @@ def post_text_to_typetalk(message_id, message_url, text):
 
     msg = '''Message-ID: {}\nMessage-URL : {}\n{}'''.format(message_id, message_url, text)
     requests.post(TYPETALK_BOT_POST_URL, {'message': msg})
+
 
 def get_message_from_mailgun(message_url):
     "Get message and attachments from Mailgun API"

@@ -8,44 +8,13 @@ from requests import Request, Session
 from email.utils import parseaddr
 from urllib.parse import urlencode
 
-#import logging
-#logging.basicConfig(level=logging.DEBUG)
-
-def validate_email_address(addr):
-    auth = ('api', MAILGUN_VALIDATION_KEY)
-    VALIDATION_API_URL = 'https://api.mailgun.net/v3/address/private/validate'
-
-    r = requests.get(VALIDATION_API_URL, auth=auth, params={'addresses': addr})
-    if r.status_code != 200:
-        raise TypetalkException('mailgun validation api error: {}'.format(r.text))
-
-    return r.json()
-
-def parse_email_address(addr):
-    auth = ('api', MAILGUN_VALIDATION_KEY)
-    PARSE_API_URL = 'https://api.mailgun.net/v3/address/private/parse'
-
-    r = requests.get(PARSE_API_URL, auth=auth, params={'addresses': addr})
-    if r.status_code != 200:
-        raise TypetalkException("mailgun parse addr api error: {}".format(addr))
-    addrjson = r.json()
-    addrs = []
-    for paddr in addrjson['parsed']:
-        fullname, addr = parseaddr(paddr)
-        addrs.append(addr)
-
-    if not addrs:
-        for paddr in addrjson['unparseable']:
-            fullname, addr = parseaddr(paddr)
-            addrs.append(addr)
-
-    return addrs
 
 def get_topic_id_from_toaddr(toaddr):
     "Parse e-mail addresses and extract typetalk topic id by Mailgun API"
 
-    addrs = parse_email_address(toaddr)
-    local_part = addrs[0].split('@')[0]
+    addrs = toaddr.replace(' ', '').split(',')
+    fullname, addr = parseaddr(addrs[0])
+    local_part = addr.split('@')[0]
 
     if local_part is None:
         raise TypetalkException('email validation failed?: {}'.format(toaddr))
@@ -58,6 +27,7 @@ def get_topic_id_from_toaddr(toaddr):
         raise TypetalkException('from address cannot parse as topicid: {}'.format(toaddr))
 
     return topicid
+
 
 from google.cloud import datastore
 class MessageStore(object):
@@ -76,8 +46,10 @@ class MessageStore(object):
         entity_key = self.client.key(CLOUD_STORE_KIND, msg_id)
         return self.client.get(entity_key)
 
+
 class TypetalkException(Exception):
     pass
+
 
 TYPETALK_API_PREFIX = 'https://typetalk.com/api/v1'
 TYPETALK_API_TOPIC_URL = TYPETALK_API_PREFIX + '/topics'
