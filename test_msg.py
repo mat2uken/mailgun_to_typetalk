@@ -1,11 +1,10 @@
 import main
 from typetalk_api import TypetalkAPI
 
-url = 'https://se.api.mailgun.net/v3/domains/mailgun-mx.nonefix.org/messages/eyJwIjpmYWxzZSwiayI6IjY4ODQzYjE2LTZiYTUtNGFmMC05MzQxLWFiMDc0M2Q5N2NmNCIsInMiOiI0NTg1OWQwZTgzIiwiYyI6InRhbmtiIn0='
-
+url = 'https://sw.api.mailgun.net/v3/domains/mailgun-mx.nonefix.org/messages/eyJwIjpmYWxzZSwiayI6ImIwN2UyYmE2LWQ2YjQtNDhjMS05N2U1LWJhZjgyNDhmN2ZiYyIsInMiOiIyYmRmODQzZmY5IiwiYyI6InRhbmtiIn0='
 topic_id, message = main.get_message_from_mailgun(url)
 
-topic_id = 97119
+#topic_id = 97119
 ret = TypetalkAPI(topic_id).post_message(message, url)
 
 post = ret.get('post')

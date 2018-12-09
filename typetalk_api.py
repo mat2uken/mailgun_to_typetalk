@@ -202,7 +202,7 @@ class TypetalkAPI(object):
         else:
             if references is not None:
                 for ref in references.split():
-                    if ref == message_entity['mesg_id']:
+                    if ref == message.get('message_id'):
                         message_entity = ms.get_entity(ref)
                         payload['replayTo'] = message_entity['typetalk_post_id']
                         break
